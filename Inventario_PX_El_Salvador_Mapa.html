@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inventario PX – El Salvador</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:Arial,sans-serif;background:#f4f5f7;color:#1a1a2e;}
+header{background:#1a1a2e;color:#fff;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;}
+header h1{font-size:16px;font-weight:700;}
+header span{font-size:12px;opacity:.5;}
+.layout{display:grid;grid-template-columns:280px 1fr;height:calc(100vh - 48px);}
+.sidebar{background:#fff;border-right:1px solid #e2e4e9;overflow-y:auto;display:flex;flex-direction:column;}
+.sb-section{padding:14px 16px;border-bottom:1px solid #f0f1f4;}
+.sec-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#9ca0b0;margin-bottom:8px;}
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+.stat{background:#f8f9fb;border-radius:7px;padding:9px 11px;}
+.stat-n{font-size:19px;font-weight:700;color:#1a1a2e;line-height:1;}
+.stat-l{font-size:10px;color:#9ca0b0;margin-top:3px;}
+select{width:100%;padding:7px 9px;border:1px solid #dde0e8;border-radius:6px;font-size:12px;color:#1a1a2e;background:#fff;cursor:pointer;margin-bottom:6px;}
+.status-row{display:flex;gap:5px;}
+.sbtn{flex:1;padding:6px 4px;border-radius:6px;font-size:11px;text-align:center;cursor:pointer;border:1px solid #dde0e8;background:#f8f9fb;color:#555;user-select:none;}
+.sbtn.active{background:#1a1a2e;color:#fff;border-color:#1a1a2e;}
+.leg-item{display:flex;align-items:center;gap:7px;font-size:12px;color:#444;margin:4px 0;}
+.dot{width:11px;height:11px;border-radius:50%;flex-shrink:0;}
+.hint{font-size:10px;color:#bbb;margin-top:8px;line-height:1.5;}
+.sel-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.sel-clear{font-size:11px;color:#bbb;cursor:pointer;text-decoration:underline;}
+.sel-clear:hover{color:#e24b4a;}
+#sel-list{max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;}
+.sel-item{background:#f0f4ff;border:1px solid #c5d3f5;border-radius:6px;padding:7px 9px;font-size:11px;display:flex;justify-content:space-between;align-items:flex-start;gap:6px;}
+.sel-item-name{font-weight:700;color:#1a1a2e;font-size:11px;line-height:1.3;}
+.sel-item-sub{color:#666;font-size:10px;margin-top:2px;line-height:1.4;}
+.sel-item-rm{cursor:pointer;color:#ccc;font-size:16px;line-height:1;flex-shrink:0;}
+.sel-item-rm:hover{color:#e24b4a;}
+.sel-empty{font-size:12px;color:#bbb;text-align:center;padding:16px 0;}
+.summary-box{background:#f0f4ff;border:1px solid #c5d3f5;border-radius:7px;padding:9px 11px;margin-bottom:8px;}
+.dl-btn{width:100%;padding:10px;border-radius:7px;background:#1a1a2e;color:#fff;font-size:12px;font-weight:700;border:none;cursor:pointer;}
+.dl-btn:hover:not(:disabled){background:#2c3052;}
+.dl-btn:disabled{background:#d1d5db;cursor:not-allowed;color:#9ca3af;}
+#map{height:100%;}
+.screen-popup{min-width:220px;}
+.popup-name{font-size:13px;font-weight:700;color:#1a1a2e;margin-bottom:2px;}
+.popup-venue{font-size:11px;color:#888;margin-bottom:6px;}
+.popup-addr{font-size:11px;color:#555;margin-bottom:8px;line-height:1.4;}
+.popup-impr{display:flex;align-items:baseline;gap:5px;margin-bottom:8px;}
+.popup-impr b{font-size:16px;color:#1a1a2e;}
+.popup-impr span{font-size:11px;color:#888;}
+.popup-status{font-size:11px;margin-bottom:10px;}
+.add-btn{width:100%;padding:8px;background:#1a1a2e;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;}
+.add-btn.added{background:#6B21A8;}
+</style>
+</head>
+<body>
+<header>
+  <h1>Inventario de Pantallas — El Salvador</h1>
+  <span id="hdr-count">151 pantallas</span>
+</header>
+<div class="layout">
+  <div class="sidebar">
+
+    <div class="sb-section">
+      <div class="sec-title">Resumen visible</div>
+      <div class="stat-grid">
+        <div class="stat"><div class="stat-n" id="s-total">151</div><div class="stat-l">Pantallas</div></div>
+        <div class="stat"><div class="stat-n" id="s-live">22</div><div class="stat-l">Live</div></div>
+        <div class="stat" style="grid-column:1/-1"><div class="stat-n" id="s-impr">—</div><div class="stat-l">Impresiones totales / 4 semanas</div></div>
+      </div>
+    </div>
+
+    <div class="sb-section">
+      <div class="sec-title">Filtros</div>
+      <select id="f-venue" onchange="applyFilters()">
+        <option value="">Todos los tipos de pantalla</option>
+      </select>
+      <select id="f-city" onchange="applyFilters()">
+        <option value="">Todas las ciudades</option>
+      </select>
+      <div class="status-row">
+        <div class="sbtn active" onclick="setStatus(this,'')">Todos</div>
+        <div class="sbtn" onclick="setStatus(this,'live')">● Live</div>
+        <div class="sbtn" onclick="setStatus(this,'on_demand')">○ On Demand</div>
+      </div>
+    </div>
+
+    <div class="sb-section">
+      <div class="sec-title">Leyenda</div>
+      <div class="leg-item"><div class="dot" style="background:#378ADD"></div>Outdoor Billboard</div>
+      <div class="leg-item"><div class="dot" style="background:#1D9E75"></div>Retail Mall</div>
+      <div class="leg-item"><div class="dot" style="background:#D85A30"></div>Transit / Aeropuerto</div>
+      <div class="leg-item"><div class="dot" style="background:#BA7517"></div>Urban Panel</div>
+      <div class="leg-item"><div class="dot" style="background:#6B21A8"></div>En mi selección</div>
+      <div class="hint">Haz clic en cualquier marcador del mapa para ver el detalle y agregarlo a tu selección.</div>
+    </div>
+
+    <div class="sb-section" style="flex:1;display:flex;flex-direction:column;">
+      <div class="sel-header">
+        <div class="sec-title" style="margin-bottom:0">
+          Mi selección &nbsp;<span id="sel-badge" style="background:#6B21A8;color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;">0</span>
+        </div>
+        <span class="sel-clear" onclick="clearSelection()">Limpiar todo</span>
+      </div>
+      <div id="sel-list"><div class="sel-empty">Ninguna pantalla seleccionada</div></div>
+      <div style="margin-top:10px;">
+        <div class="summary-box">
+          <div class="stat-n" id="sel-impr" style="font-size:16px;">—</div>
+          <div class="stat-l" style="color:#6B21A8;">Impr. de la selección / 4 sem</div>
+        </div>
+        <button class="dl-btn" id="dl-btn" onclick="downloadSelection()" disabled>⬇ Descargar selección (.xlsx)</button>
+      </div>
+    </div>
+
+  </div>
+  <div id="map"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+const DATA=[{"name":"LOS HEROES","lat":13.705,"lon":-89.21,"address":"Boulevard de Los Héroes y Avenida Los Andes, San Salvador","city":"San Salvador","venue":"Transit|Airports","impressions":1388745,"status":"live"},{"name":"LOS PROCERES","lat":13.683,"lon":-89.22,"address":"C.C. autopista sur, San Salvador","city":"San Salvador","venue":"Transit|Airports","impressions":1388745,"status":"live"},{"name":"PANAMERICANA","lat":13.676,"lon":-89.24,"address":"Carretera Panamericana, desvío Antiguo Cuscatlán","city":"La Libertad","venue":"Transit|Airports","impressions":1388745,"status":"live"},{"name":"SAN BENITO","lat":13.689,"lon":-89.23,"address":"Av. De La Revolución 159A, San Salvador","city":"San Salvador","venue":"Transit|Airports","impressions":1110753,"status":"live"},{"name":"PASEO ESCALON","lat":13.702,"lon":-89.23,"address":"C.C. Orion, Col. Escalón","city":"San Salvador","venue":"Transit|Airports","impressions":1388745,"status":"live"},{"name":"Display-2113","lat":13.679395,"lon":-89.248746,"address":"C. el Pedregal 42, Ciudad Merliot","city":"La Libertad","venue":"Retail|Malls","impressions":1671180,"status":"live"},{"name":"Display-2112","lat":13.705733,"lon":-89.210779,"address":"C.C. Metrocentro 8a Etapa, San Salvador","city":"San Salvador","venue":"Retail|Malls","impressions":1770540,"status":"live"},{"name":"Display-2095","lat":13.977203,"lon":-89.561949,"address":"Metrocentro Santa Ana","city":"Santa Ana","venue":"Retail|Malls","impressions":1671180,"status":"live"},{"name":"Display-999","lat":13.706004,"lon":-89.211675,"address":"C.C. Metrocentro, San Salvador","city":"San Salvador","venue":"Retail|Malls","impressions":3528250,"status":"live"},{"name":"Display-998","lat":13.977203,"lon":-89.561949,"address":"Metrocentro Santa Ana","city":"Santa Ana","venue":"Retail|Malls","impressions":3330250,"status":"live"},{"name":"Display-996","lat":13.679395,"lon":-89.248746,"address":"C. el Pedregal 42, Ciudad Merliot","city":"La Libertad","venue":"Retail|Malls","impressions":3754100,"status":"live"},{"name":"Display-2110","lat":13.461403,"lon":-88.165596,"address":"Metrocentro San Miguel","city":"San Miguel","venue":"Retail|Malls","impressions":1259440,"status":"live"},{"name":"Display-9431","lat":13.679395,"lon":-89.248746,"address":"Carr. Panamericana 503, Ciudad Merliot","city":"La Libertad","venue":"Retail|Malls","impressions":413896,"status":"live"},{"name":"Display-10207","lat":13.706303,"lon":-89.211822,"address":"C. Los Sisimiles, San Salvador","city":"San Salvador","venue":"Outdoor|Urban Panels","impressions":4290685,"status":"live"},{"name":"Display-59502","lat":13.718724,"lon":-89.13487,"address":"Soyapango CP 1116","city":"San Salvador","venue":"Retail|Malls","impressions":0,"status":"live"},{"name":"Display-59503","lat":13.718852,"lon":-89.13499,"address":"Soyapango CP 1116","city":"San Salvador","venue":"Retail|Malls","impressions":0,"status":"live"},{"name":"Display-57821","lat":13.728207,"lon":-89.359776,"address":"Avenida El Hipódromo, Lourdes","city":"La Libertad","venue":"Retail|Malls","impressions":0,"status":"live"},{"name":"Display-9943","lat":13.977203,"lon":-89.561949,"address":"Metrocentro Santa Ana","city":"Santa Ana","venue":"Retail|Malls","impressions":524720,"status":"live"},{"name":"Display-91702","lat":13.67978,"lon":-89.24881,"address":"Ciudad Merliot","city":"La Libertad","venue":"Outdoor|Urban Panels","impressions":0,"status":"live"},{"name":"Display-111695","lat":13.679395,"lon":-89.248746,"address":"C. el Pedregal 42, Ciudad Merliot","city":"La Libertad","venue":"Retail|Malls","impressions":3754100,"status":"live"},{"name":"Display-91467","lat":13.706303,"lon":-89.211822,"address":"C. Los Sisimiles, San Salvador","city":"San Salvador","venue":"Outdoor|Urban Panels","impressions":4290685,"status":"live"},{"name":"Display-112610","lat":13.679446,"lon":-89.248539,"address":"C. el Pedregal 42, Ciudad Merliot","city":"La Libertad","venue":"Outdoor|Urban Panels","impressions":5442570,"status":"live"},{"name":"199442710","lat":13.702323,"lon":-89.23558,"address":"CC El Paseo, hacia Salvador del Mundo","city":"San Salvador","venue":"Outdoor|Billboards","impressions":5991048,"status":"on_demand"},{"name":"234100436","lat":13.681963,"lon":-89.216157,"address":"Carretera Comalapa hacia Hermano Lejano","city":"San Salvador","venue":"Outdoor|Billboards","impressions":7025256,"status":"on_demand"},{"name":"1046642753","lat":13.44518,"lon":-89.05698,"address":"Duty Free – Frente a Placita · Aeropuerto Mons. Romero","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"1046643047","lat":13.44518,"lon":-89.05698,"address":"Duty Free – Cara A (Fte Tienda Lurix) · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"1046230935","lat":13.44518,"lon":-89.05698,"address":"Sala 6 – Pilar de Sala · Aeropuerto Mons. Romero","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"199002419","lat":13.667444,"lon":-89.223426,"address":"Calle Antigua a Huizucar hacia Paso del Jaguar","city":"San Salvador","venue":"Outdoor|Billboards","impressions":8554644,"status":"on_demand"},{"name":"1046236637","lat":13.44518,"lon":-89.05698,"address":"Sala 11 – Pilar en medio · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"1046230898","lat":13.44518,"lon":-89.05698,"address":"Sala 5 – Posición 2 · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"1046229830","lat":13.44518,"lon":-89.05698,"address":"Sala 4 – Pilar cerca de Counters · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"720046953","lat":13.44518,"lon":-89.05698,"address":"Pantalla digital frente a Sala 16 · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"450474175","lat":13.66717,"lon":-89.269961,"address":"Blvd. Orden de Malta, Fte. a Plaza Malta","city":"La Libertad","venue":"Outdoor|Billboards","impressions":5917716,"status":"on_demand"},{"name":"216246580","lat":13.710676,"lon":-89.232021,"address":"75 Av. Norte Col. Escalón y Prolongación Juan Pablo II","city":"San Salvador","venue":"Outdoor|Billboards","impressions":10957968,"status":"on_demand"},{"name":"1046198781","lat":13.44518,"lon":-89.05698,"address":"Zona Migración – Posición 1 · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"1046250987","lat":13.44518,"lon":-89.05698,"address":"Sala 15 Ala Nueva – Pilar · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"199442884","lat":13.702323,"lon":-89.23558,"address":"CC El Paseo, hacia Redondel Masferrer","city":"San Salvador","venue":"Outdoor|Billboards","impressions":5992812,"status":"on_demand"},{"name":"432881257","lat":13.70222,"lon":-89.224734,"address":"Blvd. Constitución hacia Salvador del Mundo","city":"San Salvador","venue":"Outdoor|Billboards","impressions":8604036,"status":"on_demand"},{"name":"1046684179","lat":13.44518,"lon":-89.05698,"address":"Duty Free entre Sala 12 y Attenza PS.1 · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"1046250848","lat":13.44518,"lon":-89.05698,"address":"Pilar cerca de Checkpoint Ala Nueva · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"199002382","lat":13.697223,"lon":-89.250004,"address":"Calle El Pedregal y Blvd. Cancillería hacia La Gran Vía","city":"San Salvador","venue":"Outdoor|Billboards","impressions":6797406,"status":"on_demand"},{"name":"1046296794","lat":13.44518,"lon":-89.05698,"address":"Sala 17 Ala Nueva · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"713117692","lat":13.44518,"lon":-89.05698,"address":"Digital Tags PS.1 – Sala Satélite por Attenza · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"199002397","lat":13.700786,"lon":-89.219048,"address":"Av. Roosevelt fte. Universidad Francisco Gavidia","city":"San Salvador","venue":"Outdoor|Billboards","impressions":5719896,"status":"on_demand"},{"name":"1046250589","lat":13.44518,"lon":-89.05698,"address":"Sala 13 – Pilar frente a baños · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"431128339","lat":13.699672,"lon":-89.235926,"address":"79 Av. Sur Plaza Cristal – entrada San Benito / Zona Rosa","city":"San Salvador","venue":"Outdoor|Billboards","impressions":8005536,"status":"on_demand"},{"name":"720047018","lat":13.44518,"lon":-89.05698,"address":"Pantalla digital frente a Sala 18 · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"1046672684","lat":13.44518,"lon":-89.05698,"address":"Duty Free frente a Tienda Americas PS.1 · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"1046250680","lat":13.44518,"lon":-89.05698,"address":"Sala 14 – Pilar frente a baños · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"743398903","lat":13.44518,"lon":-89.05698,"address":"Pantalla digital – Welcome Home · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"199002391","lat":13.678091,"lon":-89.264355,"address":"Calle Chiltiupan hacia Redondel Platillo","city":"Antiguo Cuscatlán","venue":"Outdoor|Billboards","impressions":7615692,"status":"on_demand"},{"name":"719058406","lat":13.44518,"lon":-89.05698,"address":"Pantalla digital – Sala Satélite PS.2 · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"1046684209","lat":13.44518,"lon":-89.05698,"address":"Duty Free entre Sala 12 y Attenza PS.2 · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"1046672504","lat":13.44518,"lon":-89.05698,"address":"Duty Free contiguo a Casa de Oro · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"913142683","lat":13.44518,"lon":-89.05698,"address":"Pantalla digital 1er nivel – filas de Migración · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"199002422","lat":13.686208,"lon":-89.237495,"address":"Alameda Manuel Enrique Araujo – Ex Feria Cifco","city":"San Salvador","venue":"Outdoor|Billboards","impressions":5719896,"status":"on_demand"},{"name":"1046672790","lat":13.44518,"lon":-89.05698,"address":"Pasillo Duty Free por Sala 1 · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"202806291","lat":13.702849,"lon":-89.193067,"address":"Alameda Juan Pablo II frente a Parque Infantil","city":"San Salvador","venue":"Outdoor|Billboards","impressions":8191008,"status":"on_demand"},{"name":"720047044","lat":13.44518,"lon":-89.05698,"address":"Pantalla digital – Sala 19 al final del pasillo · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"714584146","lat":13.44518,"lon":-89.05698,"address":"Digital Tags PS.6 – Por Montecarlo · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"1036482750","lat":13.7373,"lon":-89.2175,"address":"Final Blvd. Constitución, 100 mts antes de semáforo La Gloria","city":"San Salvador","venue":"Outdoor|Billboards","impressions":4562964,"status":"on_demand"},{"name":"199002407","lat":13.977137,"lon":-89.560957,"address":"Santa Ana – Av. Independencia, acera Metrocentro","city":"Santa Ana","venue":"Outdoor|Billboards","impressions":8094492,"status":"on_demand"},{"name":"201389553","lat":13.683464,"lon":-89.225097,"address":"Blvd. Los Próceres hacia Monumento Hermano Lejano","city":"San Salvador","venue":"Outdoor|Billboards","impressions":7311024,"status":"on_demand"},{"name":"1046226855","lat":13.44518,"lon":-89.05698,"address":"Zona Migración – Posición 3 · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"1046230315","lat":13.44518,"lon":-89.05698,"address":"Sala 5 – Posición 1 · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"1046672524","lat":13.44518,"lon":-89.05698,"address":"Duty Free frente a Attenza y Subway PS.1 · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"714584504","lat":13.44518,"lon":-89.05698,"address":"Digital Tags PS.8 – Por Sol Depot · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"1046197581","lat":13.44518,"lon":-89.05698,"address":"Zona Food Court – Posición 2 · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"1046650219","lat":13.44518,"lon":-89.05698,"address":"Duty Free entre Sala 7 y 8 · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"1046650737","lat":13.44518,"lon":-89.05698,"address":"Duty Free frente a Sala VIP Avianca PS.1 · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"870229748","lat":13.48757,"lon":-89.306869,"address":"Calle Litoral frente a Malecón hacia Playa El Tunco","city":"La Libertad","venue":"Outdoor|Billboards","impressions":6797406,"status":"on_demand"},{"name":"1046236526","lat":13.44518,"lon":-89.05698,"address":"Sala 9 – Pilar en medio · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"325847736","lat":13.676183,"lon":-89.252551,"address":"Carretera Panamericana Fte. a Gran Vía","city":"La Libertad","venue":"Outdoor|Billboards","impressions":10810800,"status":"on_demand"},{"name":"989104872","lat":13.705497,"lon":-89.215119,"address":"Blvd. Los Héroes contiguo a Despensa Don Juan / Metrosur","city":"San Salvador","venue":"Outdoor|Billboards","impressions":6797406,"status":"on_demand"},{"name":"1046650465","lat":13.44518,"lon":-89.05698,"address":"Duty Free entre St. Jacks y Sala 1 · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"1046698494","lat":13.44518,"lon":-89.05698,"address":"Frente a Puente 16 y 17 – 3er Nivel · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"273668662","lat":13.671512,"lon":-89.27403,"address":"Carretera Panamericana frente a SISA – hacia Santa Tecla","city":"Santa Tecla","venue":"Outdoor|Billboards","impressions":1966104,"status":"on_demand"},{"name":"713152307","lat":13.44518,"lon":-89.05698,"address":"Digital Tags PS.4 – Sala 1 yendo a Sala Satélite · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"235552910","lat":13.731762,"lon":-89.71351,"address":"Entrada a Sonsonate contiguo a DIDELCO","city":"Sonzacate","venue":"Outdoor|Billboards","impressions":4514328,"status":"on_demand"},{"name":"199002404","lat":13.657677,"lon":-89.27849,"address":"Carretera al Puerto de La Libertad fte. a C.C. La Joya","city":"La Libertad","venue":"Outdoor|Billboards","impressions":6797406,"status":"on_demand"},{"name":"1046228954","lat":13.44518,"lon":-89.05698,"address":"Sala 3 – Posición 2 · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"1046684114","lat":13.44518,"lon":-89.05698,"address":"Duty Free entre DFA y Sala 6 · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"743398647","lat":13.44518,"lon":-89.05698,"address":"Pantalla digital – Zona Counter 1er Nivel PS.1 · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"448416978","lat":13.70339,"lon":-89.247431,"address":"Paseo General Escalón fte. Hospital Diagnóstico","city":"San Salvador","venue":"Outdoor|Billboards","impressions":8005536,"status":"on_demand"},{"name":"1046250377","lat":13.44518,"lon":-89.05698,"address":"Sala 12 – Pilar en medio · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"1046297115","lat":13.44518,"lon":-89.05698,"address":"Sala 19 Ala Nueva – 2do Pilar · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"432409608","lat":13.69732,"lon":-89.244525,"address":"Calle La Mascota contiguo a Plaza Las Azaleas","city":"San Salvador","venue":"Outdoor|Billboards","impressions":7623756,"status":"on_demand"},{"name":"1046649995","lat":13.44518,"lon":-89.05698,"address":"Duty Free fte. Artesanías PS.2 · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"1046673407","lat":13.44518,"lon":-89.05698,"address":"Duty Free contiguo a Tienda Cigar y Área Cultura · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"1046296931","lat":13.44518,"lon":-89.05698,"address":"Sala 18 Ala Nueva – lado pasillo comercial · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"1046236574","lat":13.44518,"lon":-89.05698,"address":"Sala 10 – Pilar frente a baños · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"199002394","lat":13.679488,"lon":-89.275877,"address":"Calle Chiltiupan fte. Plaza Merliot – hacia Santa Tecla","city":"La Libertad","venue":"Outdoor|Billboards","impressions":5718888,"status":"on_demand"},{"name":"1046231432","lat":13.44518,"lon":-89.05698,"address":"Sala 8 – Posición 1 · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"199002373","lat":13.701578,"lon":-89.227581,"address":"Paseo General Escalón fte. Colegio Sagrada Familia","city":"San Salvador","venue":"Outdoor|Billboards","impressions":4136832,"status":"on_demand"},{"name":"199002376","lat":13.683244,"lon":-89.231677,"address":"Blvd. Los Próceres hacia Blvd. Monseñor Romero","city":"San Salvador","venue":"Outdoor|Billboards","impressions":7763364,"status":"on_demand"},{"name":"1046231334","lat":13.44518,"lon":-89.05698,"address":"Sala 7 – Posición 2 · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"714564829","lat":13.44518,"lon":-89.05698,"address":"Digital Tags PS.5 – Por Montecarlo · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"199002448","lat":13.685447,"lon":-89.238121,"address":"Carretera Panamericana fte. C.C. Feria Rosa","city":"San Salvador","venue":"Outdoor|Billboards","impressions":6364260,"status":"on_demand"},{"name":"240879769","lat":13.693018,"lon":-89.216826,"address":"49 Av. Sur frente a Autocentro – hacia Comalapa","city":"San Salvador","venue":"Outdoor|Billboards","impressions":4790520,"status":"on_demand"},{"name":"1046649966","lat":13.44518,"lon":-89.05698,"address":"Duty Free fte. Artesanías PS.1 · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"1046297559","lat":13.44518,"lon":-89.05698,"address":"Duty Free fte. a Placita PS.1 · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"239150896","lat":13.713837,"lon":-89.247352,"address":"Avenida Masferrer Norte hacia Redondel Luceiro","city":"San Salvador","venue":"Outdoor|Billboards","impressions":1132901,"status":"on_demand"},{"name":"1046672638","lat":13.44518,"lon":-89.05698,"address":"Duty Free fte. Attenza y Subway PS.2 · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"239112592","lat":13.461761,"lon":-88.163434,"address":"San Miguel – Av. Roosevelt a 50 mts. de Metrocentro","city":"San Miguel","venue":"Outdoor|Billboards","impressions":6696648,"status":"on_demand"},{"name":"1046297425","lat":13.44518,"lon":-89.05698,"address":"Duty Free costado Tommy Hilfiger y fte. Montecarlo · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"1046649739","lat":13.44518,"lon":-89.05698,"address":"Duty Free antes de Sala 11 PS.1 · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"989126636","lat":13.690154,"lon":-89.239838,"address":"Zona Rosa fte. Redondel Italia, Col. San Benito","city":"San Salvador","venue":"Outdoor|Billboards","impressions":1132901,"status":"on_demand"},{"name":"199002410","lat":13.690889,"lon":-89.238028,"address":"Blvd. El Hipódromo Zona Rosa fte. C.C. Bambú","city":"San Salvador","venue":"Outdoor|Billboards","impressions":5874876,"status":"on_demand"},{"name":"428522327","lat":13.677715,"lon":-89.22586,"address":"Estadio Cuscatlán – antes Gasolinera Texaco Loma Linda","city":"San Salvador","venue":"Outdoor|Billboards","impressions":5213628,"status":"on_demand"},{"name":"1046296601","lat":13.44518,"lon":-89.05698,"address":"Sala 16 Ala Nueva – 4to Pilar · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"713152275","lat":13.44518,"lon":-89.05698,"address":"Digital Tags PS.3 – Por Sala 1 · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"1046673155","lat":13.44518,"lon":-89.05698,"address":"Duty Free contiguo a Tienda Diana · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"1046229316","lat":13.44518,"lon":-89.05698,"address":"Sala 3 – Posición 3 · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"1046649854","lat":13.44518,"lon":-89.05698,"address":"Duty Free antes de Sala 11 PS.2 · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"1046691430","lat":13.44518,"lon":-89.05698,"address":"Pasillo Comercial frente a Pizza Hut – Área Nueva · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"246715497","lat":13.700753,"lon":-89.224048,"address":"Frente a Monumento El Salvador del Mundo hacia Av. Roosevelt","city":"San Salvador","venue":"Outdoor|Billboards","impressions":7623756,"status":"on_demand"},{"name":"199002401","lat":13.70014,"lon":-89.153011,"address":"Soyapango – Blvd. del Ejército hacia Plaza Mundo","city":"Soyapango","venue":"Outdoor|Billboards","impressions":10782072,"status":"on_demand"},{"name":"261089700","lat":13.68203,"lon":-89.242212,"address":"Fte. a Ceiba de Guadalupe hacia Hospital El Salvador","city":"San Salvador","venue":"Outdoor|Billboards","impressions":7763364,"status":"on_demand"},{"name":"316769631","lat":13.67472,"lon":-89.253304,"address":"Carretera Panamericana, Hacienda Real – hacia San Salvador","city":"La Libertad","venue":"Outdoor|Billboards","impressions":7382844,"status":"on_demand"},{"name":"199002416","lat":13.699449,"lon":-89.216244,"address":"49 Av. Sur fte. Estadio Mágico González – hacia Metrocentro","city":"San Salvador","venue":"Outdoor|Billboards","impressions":5964840,"status":"on_demand"},{"name":"Airport-Extra","lat":13.44518,"lon":-89.05698,"address":"Pantalla digital – 3er Nivel frente a Puente 18 · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"1046691295","lat":13.44518,"lon":-89.05698,"address":"Duty Free frente a Tienda Lurix – Cara B · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"1046650679","lat":13.44518,"lon":-89.05698,"address":"Duty Free fte. Tienda Attenza y Sala 11 · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"1046231213","lat":13.44518,"lon":-89.05698,"address":"Sala 7 – Posición 1 (cerca de Puente de Abordaje) · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"743398822","lat":13.44518,"lon":-89.05698,"address":"Pantalla digital – Zona Counters 1er Nivel PS.2 · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"1046650556","lat":13.44518,"lon":-89.05698,"address":"Duty Free entre Subway y Tienda Luryx · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"743398872","lat":13.44518,"lon":-89.05698,"address":"Pantalla digital – Zona Counters 1er Nivel PS.3 · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"1046236453","lat":13.44518,"lon":-89.05698,"address":"Sala 8 – Posición 2 (cerca de Puente de Abordaje) · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"1046673060","lat":13.44518,"lon":-89.05698,"address":"Duty Free entre Luryx y Sala 2 · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"199002439","lat":13.465823,"lon":-88.172682,"address":"San Miguel – Av. Roosevelt fte. Omnisport","city":"San Miguel","venue":"Outdoor|Billboards","impressions":5991048,"status":"on_demand"},{"name":"1046228248","lat":13.44518,"lon":-89.05698,"address":"Sala 3 – Posición 1 · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"714584292","lat":13.44518,"lon":-89.05698,"address":"Digital Tags PS.7 – Por Sol Depot · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"1046297307","lat":13.44518,"lon":-89.05698,"address":"Zona de Equipaje Banda 2 – Pilar · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"989098812","lat":13.683121,"lon":-89.231985,"address":"Blvd. Los Próceres frente a Torre Cuscatlán","city":"San Salvador","venue":"Outdoor|Billboards","impressions":1132901,"status":"on_demand"},{"name":"1046650987","lat":13.44518,"lon":-89.05698,"address":"Duty Free contiguo a cajeros frente a Sala 8 · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"1046198309","lat":13.44518,"lon":-89.05698,"address":"Zona Food Court – Posición 3 · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"719054779","lat":13.44518,"lon":-89.05698,"address":"Digital Tag Pasillo Comercial PS.9 – Por Sala 12 · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"199831320","lat":13.708338,"lon":-89.211202,"address":"Blvd. de Los Héroes fte. China Work","city":"San Salvador","venue":"Outdoor|Billboards","impressions":5719896,"status":"on_demand"},{"name":"199002379","lat":13.712808,"lon":-89.224586,"address":"Blvd. Constitución hacia Redondel","city":"San Salvador","venue":"Outdoor|Billboards","impressions":5991048,"status":"on_demand"},{"name":"1046227979","lat":13.44518,"lon":-89.05698,"address":"Sala 2 – Pilar en medio · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"713152199","lat":13.44518,"lon":-89.05698,"address":"Digital Tags PS.2 – hacia Sala Satélite · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"1046650872","lat":13.44518,"lon":-89.05698,"address":"Duty Free fte. Sala VIP Avianca PS.2 · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"1045000340","lat":13.44518,"lon":-89.05698,"address":"Zona Food Court – Posición 1 · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"1046227702","lat":13.44518,"lon":-89.05698,"address":"Zona Migración – Posición 4 · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"199002431","lat":13.975556,"lon":-89.56167,"address":"Santa Ana – Entrada Principal frente a Metrocentro","city":"Santa Ana","venue":"Outdoor|Billboards","impressions":3355128,"status":"on_demand"},{"name":"216005744","lat":13.673882,"lon":-89.253318,"address":"Boulevard Santa Elena hacia Embajada Americana","city":"Antiguo Cuscatlán","venue":"Outdoor|Billboards","impressions":9150624,"status":"on_demand"},{"name":"743398297","lat":13.44518,"lon":-89.05698,"address":"Pantalla digital – 3er Nivel sobre filas de Migración · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"431128437","lat":13.693111,"lon":-89.219118,"address":"Final Blvd. Arturo Castellanos fte. Terminal de Occidente","city":"San Salvador","venue":"Outdoor|Billboards","impressions":5917716,"status":"on_demand"},{"name":"1046672717","lat":13.44518,"lon":-89.05698,"address":"Duty Free fte. Tienda Americas PS.2 · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"720046789","lat":13.44518,"lon":-89.05698,"address":"Pantalla digital – Punto de Inspección Nivel 2 · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"},{"name":"1046198917","lat":13.44518,"lon":-89.05698,"address":"Zona Migración – Posición 2 · Aeropuerto","city":"San Luis Talpa","venue":"Outdoor|Billboards","impressions":4127004,"status":"on_demand"}];
+
+const COLORS={'Outdoor|Billboards':'#378ADD','Retail|Malls':'#1D9E75','Transit|Airports':'#D85A30','Outdoor|Urban Panels':'#BA7517'};
+const VL={'Outdoor|Billboards':'Outdoor Billboard','Retail|Malls':'Retail Mall','Transit|Airports':'Transit / Aeropuerto','Outdoor|Urban Panels':'Urban Panel'};
+let statusFilter='', visMarkers=[], selected=new Set(), mMap={};
+
+function fmt(n){return n>=1e6?(n/1e6).toFixed(1)+'M':n>=1e3?Math.round(n/1e3)+'K':n.toLocaleString();}
+
+function mkIcon(venue,live,sel){
+  const c=sel?'#6B21A8':(COLORS[venue]||'#888');
+  const s=sel?16:13;
+  return L.divIcon({className:'',html:`<div style="width:${s}px;height:${s}px;border-radius:50%;background:${c};border:2.5px solid #fff;opacity:${live?1:0.65};box-shadow:0 1px 4px rgba(0,0,0,.3)"></div>`,iconSize:[s,s],iconAnchor:[s/2,s/2]});
+}
+
+function toggleSelect(i){
+  if(selected.has(i))selected.delete(i);else selected.add(i);
+  if(mMap[i])mMap[i].setIcon(mkIcon(DATA[i].venue,DATA[i].status==='live',selected.has(i)));
+  renderSel();
+}
+
+function renderSel(){
+  const arr=[...selected];
+  document.getElementById('sel-badge').textContent=arr.length;
+  const list=document.getElementById('sel-list');
+  if(!arr.length){list.innerHTML='<div class="sel-empty">Ninguna pantalla seleccionada</div>';}
+  else{
+    list.innerHTML=arr.map(i=>{
+      const d=DATA[i];
+      return `<div class="sel-item">
+        <div>
+          <div class="sel-item-name">${d.name}</div>
+          <div class="sel-item-sub">${VL[d.venue]||d.venue} · ${d.city}</div>
+          <div class="sel-item-sub">${fmt(d.impressions)} impr / 4 sem</div>
+        </div>
+        <span class="sel-item-rm" onclick="toggleSelect(${i})" title="Quitar">×</span>
+      </div>`;
+    }).join('');
+  }
+  const tot=arr.reduce((a,i)=>a+DATA[i].impressions,0);
+  document.getElementById('sel-impr').textContent=arr.length?fmt(tot):'—';
+  document.getElementById('dl-btn').disabled=!arr.length;
+}
+
+function clearSelection(){
+  selected.forEach(i=>{if(mMap[i])mMap[i].setIcon(mkIcon(DATA[i].venue,DATA[i].status==='live',false));});
+  selected.clear();renderSel();
+}
+
+function downloadSelection(){
+  const rows=[['ID / Nombre','Tipo de Pantalla','Ciudad','Dirección','Estado','Impresiones 4 semanas','Latitud','Longitud']];
+  [...selected].forEach(i=>{
+    const d=DATA[i];
+    rows.push([d.name,VL[d.venue]||d.venue,d.city,d.address,d.status==='live'?'Live':'On Demand',d.impressions,d.lat,d.lon]);
+  });
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols']=[{wch:24},{wch:22},{wch:18},{wch:55},{wch:12},{wch:24},{wch:12},{wch:12}];
+  const hStyle={font:{bold:true},fill:{fgColor:{rgb:'1A1A2E'}},alignment:{horizontal:'center'}};
+  ['A1','B1','C1','D1','E1','F1','G1','H1'].forEach(c=>{if(ws[c])ws[c].s=hStyle;});
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,'Selección SV',ws);
+  XLSX.writeFile(wb,'Seleccion_PX_El_Salvador.xlsx');
+}
+
+function applyFilters(){
+  const v=document.getElementById('f-venue').value;
+  const c=document.getElementById('f-city').value;
+  const fil=DATA.map((d,i)=>({d,i})).filter(({d})=>(v?d.venue===v:true)&&(c?d.city===c:true)&&(statusFilter?d.status===statusFilter:true));
+  visMarkers.forEach(m=>m.remove());visMarkers=[];mMap={};
+  fil.forEach(({d,i})=>{
+    const m=L.marker([d.lat,d.lon],{icon:mkIcon(d.venue,d.status==='live',selected.has(i))}).addTo(map);
+    m.bindPopup(`<div class="screen-popup">
+      <div class="popup-name">${d.name}</div>
+      <div class="popup-venue">${VL[d.venue]||d.venue} &nbsp;·&nbsp; ${d.city}</div>
+      <div class="popup-addr">${d.address}</div>
+      <div class="popup-impr"><b>${fmt(d.impressions)}</b><span>impresiones / 4 semanas</span></div>
+      <div class="popup-status" style="color:${d.status==='live'?'#1D9E75':'#888'}">${d.status==='live'?'● Live':'○ On Demand'}</div>
+      <button class="add-btn${selected.has(i)?' added':''}" id="pbtn${i}"
+        onclick="toggleSelect(${i});var b=document.getElementById('pbtn${i}');b.textContent=selected.has(${i})?'✓ En selección':'+ Agregar a selección';b.classList.toggle('added',selected.has(${i}));">
+        ${selected.has(i)?'✓ En selección':'+ Agregar a selección'}
+      </button>
+    </div>`,{maxWidth:260});
+    mMap[i]=m;visMarkers.push(m);
+  });
+  document.getElementById('s-total').textContent=fil.length;
+  document.getElementById('s-live').textContent=fil.filter(({d})=>d.status==='live').length;
+  document.getElementById('s-impr').textContent=fmt(fil.reduce((a,{d})=>a+d.impressions,0));
+  document.getElementById('hdr-count').textContent=fil.length+' pantallas';
+}
+
+function setStatus(el,val){document.querySelectorAll('.sbtn').forEach(b=>b.classList.remove('active'));el.classList.add('active');statusFilter=val;applyFilters();}
+
+const map=L.map('map').setView([13.67,-89.2],9);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{maxZoom:19,attribution:'© OpenStreetMap © CARTO'}).addTo(map);
+
+const venues=[...new Set(DATA.map(d=>d.venue))].sort();
+const cities=[...new Set(DATA.map(d=>d.city))].sort();
+const vs=document.getElementById('f-venue');
+venues.forEach(v=>{const o=document.createElement('option');o.value=v;o.textContent=VL[v]||v;vs.appendChild(o);});
+const cs=document.getElementById('f-city');
+cities.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;cs.appendChild(o);});
+applyFilters();
+</script>
+</body>
+</html>
